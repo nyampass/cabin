@@ -16,7 +16,8 @@
                  [prone "0.8.2"]
                  [org.clojure/tools.nrepl "0.2.10"]
                  [com.novemberain/monger "2.0.1"]
-                 [aleph "0.4.0"]]
+                 [aleph "0.4.0"]
+                 [digest "1.4.4"]]
   :min-lein-version "2.0.0"
   :uberjar-name "cabin.jar"
   :jvm-opts ["-server"]
