@@ -1,68 +1,85 @@
 (ns cabin.prototype
   (:require
-   [compojure.core :as compojure :refer [GET]]
-   [ring.middleware.params :as params]
+   [compojure.core :refer :all]
+   [ring.util.response :as res]
+   [ring.middleware
+    [params :refer [wrap-params]]
+    [format :refer [wrap-restful-format]]]
    [compojure.route :as route]
    [aleph.http :as http]
    [byte-streams :as bs]
    [manifold.stream :as s]
    [manifold.deferred :as d]
-   [manifold.bus :as bus]))
+   [manifold.bus :as bus]
+   [taoensso.timbre :as timbre]
+   [digest :as digest]))
+
+(defonce ids (atom {}))
+(defonce connections (atom {}))
+(defonce receiver (atom nil))
+
+(defonce debug (atom nil))
 
 (def non-websocket-request
   {:status 400
    :headers {"content-type" "application/text"}
    :body "Expected a websocket request."})
 
-(defn echo-handler
-    "The previous handler blocks until the websocket handshake completes, which unnecessarily
-   takes up a thread.  This accomplishes the same as above, but asynchronously. "
-    [req]
-    (-> (http/websocket-connection req)
-        (d/chain
-         (fn [socket]
-           (s/connect socket socket)))
-        (d/catch
-            (fn [_]
-              non-websocket-request))))
+(defn ws-handler [req]
+  (-> (http/websocket-connection req)
+      (d/chain
+       (fn [socket]
+         (s/connect socket socket)))
+      (d/catch
+          (fn [_]
+            non-websocket-request))))
 
-;; to represent all the different chat rooms, we use an **event bus**, which is simple
-;; implementation of the publish/subscribe model
-(def chatrooms (bus/event-bus))
+(defn issue-id [{:keys [remote-addr]}]
+  (let [time (with-out-str
+               (#'clojure.instant/print-date (java.util.Date.) *out*))
+        new-id (digest/sha1 (str remote-addr time))]
+    (swap! ids assoc new-id remote-addr)
+    (res/response {:status :ok :id new-id})))
 
-(defn chat-handler
-  [req]
-  (d/let-flow [conn (d/catch
-                        (http/websocket-connection req)
-                        (fn [_] nil))]
+(defn register-receiver [{{:keys [id password]} :params :as req}]
+  (if-not (contains? @ids id)
+    (res/response {:status :error :cause :invalid-id})
+    (do (when @receiver
+          ;; FIXME: previous receiver should be reported revocation
+          nil)
+        (reset! receiver {:id id :password password})
+        (res/response {:status :ok :id id}))))
 
-              (if-not conn
+(defn register-sender [{{:keys [id session password]} :params}]
+  (if-not (contains? @ids id)
+    (res/response {:status :error :cause :invalid-id})
+    (let [receiver @receiver]
+      (if (and (= session (:id receiver))
+               (= password (:password receiver)))
+        (res/response {:status :ok :id id})
+        (res/response {:status :error :cause :authentication-failure})))))
 
-                ;; if it wasn't a valid websocket handshake, return an error
-                non-websocket-request
+(defroutes handler
+  (POST "/id" req
+        (issue-id req))
+  (POST "/receiver" req
+        (register-receiver req))
+  (POST "/sender" req
+        (register-sender req))
+  (route/not-found "No such page."))
 
-                ;; otherwise, take the first two messages, which give us the chatroom and name
-                (d/let-flow [room (s/take! conn)
-                             name (s/take! conn)]
+(def app
+  (-> handler
+      (wrap-restful-format {:formats [:json-kw]})))
 
-                            ;; take all messages from the chatroom, and feed them to the client
-                            (s/connect
-                             (bus/subscribe chatrooms room)
-                             conn)
-
-                            ;; take all messages from the client, prepend the name, and publish it to the room
-                            (s/consume
-                             #(bus/publish! chatrooms room %)
-                             (->> conn
-                                  (s/map #(str name ": " %))
-                                  (s/buffer 100)))))))
-
-(def handler
-  (params/wrap-params
-   (compojure/routes
-    (GET "/echo" [] echo-handler)
-    (GET "/chat" [] chat-handler)
-    (route/not-found "No such page."))))
+(defonce server (atom nil))
 
 (defn start-server []
-  (http/start-server handler {:port 10000}))
+  (let [s (http/start-server #'app {:port 10000})]
+    (reset! server s)
+    s))
+
+(defn stop-server []
+  (let [s @server]
+    (reset! server nil)
+    (.close s)))
