@@ -39,7 +39,7 @@
   []
   (timbre/set-config!
     [:appenders :rotor]
-    {:min-level             :info
+    {:min-level             (if (env :dev) :debug :info)
      :enabled?              true
      :async?                false ; should be always false for rotor
      :max-message-per-msecs nil
