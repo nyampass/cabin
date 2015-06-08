@@ -59,13 +59,18 @@
         (res/response {:status :ok :id id})
         (res/response {:status :error :cause :authentication-failure})))))
 
+(defn start-connection [req]
+  (-> (http/websocket-connection req)
+      (d/chain
+       (fn [socket]
+         (s/connect socket socket)))
+      (d/catch
+          (fn [_]
+            non-websocket-request))))
+
 (defroutes handler
-  (POST "/id" req
-        (issue-id req))
-  (POST "/receiver" req
-        (register-receiver req))
-  (POST "/sender" req
-        (register-sender req))
+  (GET "/ws" req
+       (start-connection req))
   (route/not-found "No such page."))
 
 (def app
