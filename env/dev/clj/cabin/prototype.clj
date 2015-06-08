@@ -82,16 +82,24 @@
                           :status :error
                           :cause :not-server}))))
 
-(defn on-message [raw-message]
-  (let [message (json/read-str raw-message :key-fn keyword)
-        {:keys [type from]} message]
-    (if (valid-id? from)
-      (handle-message message))))
+(defn on-message-handler [conn]
+  (fn [raw-message]
+    (let [message (json/read-str raw-message :key-fn keyword)
+          {:keys [type from]} message]
+      (if (valid-id? from)
+        (handle-message message)
+        (send-message conn {:type :error :cause :invalid-from})))))
 
 (defn start-connection [req]
   (d/let-flow [conn (connect req)]
-    (-> (s/consume #(on-message %) conn)
-        (d/catch (constantly non-websocket-request)))))
+    (-> (s/consume (on-message-handler conn) conn)
+        (d/catch
+          (fn [_]
+            (when-not (s/closed? conn)
+              (send-message conn {:type :error
+                                  :cause :unexpected-error}))
+            ;; TODO: postprocess should be performed such as unregistration
+            )))))
 
 (defroutes handler
   (GET "/ws" req
