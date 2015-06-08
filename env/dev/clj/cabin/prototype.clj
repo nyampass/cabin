@@ -59,27 +59,34 @@
 (defn demote-to-client! [id]
   (swap! connections update-in [id] dissoc :server? :password))
 
+(defmulti handle-message (comp keyword :type))
+(defmethod handle-message :default [{:keys [from]}]
+  (let [conn (connection-for from)]
+    (send-message conn {:type :error :cause :unknown-message})))
+
+(defmethod handle-message :promote [{:keys [from] :as message}]
+  (let [conn (connection-for from)]
+    (if-let [password (:password message)]
+      (do (promote-to-server! from password)
+          (send-message conn {:type :promote :status :ok}))
+      (send-message conn {:type :promote
+                          :status :error
+                          :cause :password-missing}))))
+
+(defmethod handle-message :demote [{:keys [from] :as message}]
+  (let [conn (connection-for from)]
+    (if (server? from)
+      (do (demote-to-client! from)
+          (send-message conn {:type :demote :status :ok}))
+      (send-message conn {:type :demote
+                          :status :error
+                          :cause :not-server}))))
+
 (defn on-message [raw-message]
   (let [message (json/read-str raw-message :key-fn keyword)
         {:keys [type from]} message]
     (if (valid-id? from)
-      (case type
-        "promote"
-        #_=> (let [conn (connection-for from)]
-               (if-let [password (:password message)]
-                 (do (promote-to-server! from password)
-                     (send-message conn {:type :promote :status :ok}))
-                 (send-message conn {:type :promote
-                                     :status :error
-                                     :cause :password-missing})))
-        "demote"
-        #_=> (let [conn (connection-for from)]
-               (if (server? from)
-                 (do (demote-to-client! from)
-                     (send-message conn {:type :demote :status :ok}))
-                 (send-message conn {:type :demote
-                                     :status :error
-                                     :cause :not-server})))))))
+      (handle-message message))))
 
 (defn start-connection [req]
   (d/let-flow [conn (connect req)]
