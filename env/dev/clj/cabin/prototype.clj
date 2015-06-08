@@ -50,8 +50,14 @@
       (send-message conn {:type :connected :id new-id})
       conn)))
 
+(defn server? [id]
+  (get-in @connections [id :server?]))
+
 (defn promote-to-server! [id pass]
   (swap! connections update-in [id] merge {:server? true :password pass}))
+
+(defn demote-to-client! [id]
+  (swap! connections update-in [id] dissoc :server? :password))
 
 (defn on-message [raw-message]
   (let [message (json/read-str raw-message :key-fn keyword)
@@ -65,7 +71,15 @@
                      (send-message conn {:type :promote :status :ok}))
                  (send-message conn {:type :promote
                                      :status :error
-                                     :cause :password-missing})))))))
+                                     :cause :password-missing})))
+        "demote"
+        #_=> (let [conn (connection-for from)]
+               (if (server? from)
+                 (do (demote-to-client! from)
+                     (send-message conn {:type :demote :status :ok}))
+                 (send-message conn {:type :demote
+                                     :status :error
+                                     :cause :not-server})))))))
 
 (defn start-connection [req]
   (d/let-flow [conn (connect req)]
