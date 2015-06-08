@@ -34,11 +34,14 @@
 (defn unregister-id! [id]
   (swap! connections dissoc id))
 
+(defn send-message [conn message]
+  (s/put! conn (json/write-str message)))
+
 (defn connect [req]
   (d/let-flow [conn (http/websocket-connection req)]
     (let [new-id (register-connection! req conn)]
       (s/on-closed conn #(unregister-id! new-id))
-      (s/put! conn (json/write-str {:type :connected :id new-id}))
+      (send-message conn {:type :connected :id new-id})
       conn)))
 
 (defn start-connection [req]
