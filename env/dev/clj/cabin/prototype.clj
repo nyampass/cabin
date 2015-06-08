@@ -12,11 +12,10 @@
    [manifold.deferred :as d]
    [manifold.bus :as bus]
    [taoensso.timbre :as timbre]
-   [digest :as digest]))
+   [digest :as digest]
+   [clojure.data.json :as json]))
 
-(defonce ids (atom {}))
 (defonce connections (atom {}))
-(defonce receiver (atom nil))
 
 (defonce debug (atom nil))
 
@@ -33,13 +32,6 @@
       (d/catch
           (fn [_]
             non-websocket-request))))
-
-(defn issue-id [{:keys [remote-addr]}]
-  (let [time (with-out-str
-               (#'clojure.instant/print-date (java.util.Date.) *out*))
-        new-id (digest/sha1 (str remote-addr time))]
-    (swap! ids assoc new-id remote-addr)
-    (res/response {:status :ok :id new-id})))
 
 (defn register-receiver [{{:keys [id password]} :params :as req}]
   (if-not (contains? @ids id)
@@ -59,14 +51,27 @@
         (res/response {:status :ok :id id})
         (res/response {:status :error :cause :authentication-failure})))))
 
+(defn register-connection! [{ip-address :remote-addr} conn]
+  (let [now (with-out-str
+              (#'clojure.instant/print-date (java.util.Date.) *out*))
+        new-id (digest/sha1 (str ip-address now))]
+    (swap! connections assoc-in [new-id :conn] conn)
+    new-id))
+
+(defn unregister-id! [id]
+  (swap! connections dissoc id))
+
+(defn connect [req]
+  (d/let-flow [conn (http/websocket-connection req)]
+    (let [new-id (register-connection! req conn)]
+      (s/on-closed conn #(unregister-id! new-id))
+      (s/put! conn (json/write-str {:type :connected :id new-id}))
+      conn)))
+
 (defn start-connection [req]
-  (-> (http/websocket-connection req)
-      (d/chain
-       (fn [socket]
-         (s/connect socket socket)))
-      (d/catch
-          (fn [_]
-            non-websocket-request))))
+  (d/let-flow [conn (connect req)]
+    (-> (s/connect conn conn)
+        (d/catch (constantly non-websocket-request)))))
 
 (defroutes handler
   (GET "/ws" req
