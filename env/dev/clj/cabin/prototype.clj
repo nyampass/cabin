@@ -24,12 +24,18 @@
    :headers {"content-type" "application/text"}
    :body "Expected a websocket request."})
 
+(defn connection-for [id]
+  (get-in @connections [id :conn]))
+
 (defn register-connection! [{ip-address :remote-addr} conn]
   (let [now (with-out-str
               (#'clojure.instant/print-date (java.util.Date.) *out*))
         new-id (digest/sha1 (str ip-address now))]
     (swap! connections assoc-in [new-id :conn] conn)
     new-id))
+
+(defn valid-id? [id]
+  (contains? @connections id))
 
 (defn unregister-id! [id]
   (swap! connections dissoc id))
@@ -44,9 +50,26 @@
       (send-message conn {:type :connected :id new-id})
       conn)))
 
+(defn promote-to-server! [id pass]
+  (swap! connections update-in [id] merge {:server? true :password pass}))
+
+(defn on-message [raw-message]
+  (let [message (json/read-str raw-message :key-fn keyword)
+        {:keys [type from]} message]
+    (if (valid-id? from)
+      (case type
+        "promote"
+        #_=> (let [conn (connection-for from)]
+               (if-let [password (:password message)]
+                 (do (promote-to-server! from password)
+                     (send-message conn {:type :promote :status :ok}))
+                 (send-message conn {:type :promote
+                                     :status :error
+                                     :cause :password-missing})))))))
+
 (defn start-connection [req]
   (d/let-flow [conn (connect req)]
-    (-> (s/connect conn conn)
+    (-> (s/consume #(on-message %) conn)
         (d/catch (constantly non-websocket-request)))))
 
 (defroutes handler
