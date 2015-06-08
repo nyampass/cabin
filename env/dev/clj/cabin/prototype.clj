@@ -24,33 +24,6 @@
    :headers {"content-type" "application/text"}
    :body "Expected a websocket request."})
 
-(defn ws-handler [req]
-  (-> (http/websocket-connection req)
-      (d/chain
-       (fn [socket]
-         (s/connect socket socket)))
-      (d/catch
-          (fn [_]
-            non-websocket-request))))
-
-(defn register-receiver [{{:keys [id password]} :params :as req}]
-  (if-not (contains? @ids id)
-    (res/response {:status :error :cause :invalid-id})
-    (do (when @receiver
-          ;; FIXME: previous receiver should be reported revocation
-          nil)
-        (reset! receiver {:id id :password password})
-        (res/response {:status :ok :id id}))))
-
-(defn register-sender [{{:keys [id session password]} :params}]
-  (if-not (contains? @ids id)
-    (res/response {:status :error :cause :invalid-id})
-    (let [receiver @receiver]
-      (if (and (= session (:id receiver))
-               (= password (:password receiver)))
-        (res/response {:status :ok :id id})
-        (res/response {:status :error :cause :authentication-failure})))))
-
 (defn register-connection! [{ip-address :remote-addr} conn]
   (let [now (with-out-str
               (#'clojure.instant/print-date (java.util.Date.) *out*))
