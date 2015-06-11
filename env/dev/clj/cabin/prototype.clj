@@ -53,6 +53,9 @@
 (defn server? [peer-id]
   (get-in @peers [peer-id :server?]))
 
+(defn password-for [peer-id]
+  (get-in @peers [peer-id :password]))
+
 (defn promote-to-server! [peer-id pass]
   (swap! peers update-in [peer-id] merge {:server? true :password pass}))
 
@@ -61,9 +64,15 @@
 
 (defmulti handle-message (comp keyword :type))
 
-(defmethod handle-message :default [{:keys [from to] :as message}]
+(defmethod handle-message :default [{:keys [from to password] :as message}]
   (let [conn (connection-for from)]
-    (send-message conn {:type :error :cause :unknown-message})))
+    (cond (or (nil? to) (not (valid-peer? to)))
+          #_=> (send-message conn {:type :error :cause :invalid-destination})
+          (not (server? to))
+          #_=> (send-message conn {:type :error :cause :nonserver-destination})
+          (or (nil? password) (not= password (password-for to)))
+          #_=> (send-message conn {:type :error :cause :authorization-failed})
+          :else (send-message (connection-for to) (dissoc message :password)))))
 
 (defmethod handle-message :promote [{:keys [from] :as message}]
   (let [conn (connection-for from)]
