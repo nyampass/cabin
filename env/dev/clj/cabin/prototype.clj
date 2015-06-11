@@ -45,26 +45,26 @@
       (send-message conn {:type :connected :peer-id new-id})
       conn)))
 
-(defn server? [peer-id]
-  (get-in @peers [peer-id :server?]))
+(defn receiver? [peer-id]
+  (get-in @peers [peer-id :receiver?]))
 
 (defn password-for [peer-id]
   (get-in @peers [peer-id :password]))
 
-(defn promote-to-server! [peer-id pass]
-  (swap! peers update-in [peer-id] merge {:server? true :password pass}))
+(defn promote-to-receiver! [peer-id pass]
+  (swap! peers update-in [peer-id] merge {:receiver? true :password pass}))
 
 (defn demote-to-client! [peer-id]
-  (swap! peers update-in [peer-id] dissoc :server? :password))
+  (swap! peers update-in [peer-id] dissoc :receiver? :password))
 
 (defmulti handle-message (comp keyword :type))
 
 (defmethod handle-message :default [{:keys [from to password] :as message}]
   (let [conn (connection-for from)]
     (cond (or (nil? to) (not (valid-peer? to)))
-          #_=> (send-message conn {:type :error :cause :invalid-destination})
-          (not (server? to))
-          #_=> (send-message conn {:type :error :cause :nonserver-destination})
+          #_=> (send-message conn {:type :error :cause :invalid-receiver})
+          (not (receiver? to))
+          #_=> (send-message conn {:type :error :cause :not-receiver})
           (or (nil? password) (not= password (password-for to)))
           #_=> (send-message conn {:type :error :cause :authorization-failed})
           :else (send-message (connection-for to) (dissoc message :password)))))
@@ -72,7 +72,7 @@
 (defmethod handle-message :promote [{:keys [from] :as message}]
   (let [conn (connection-for from)]
     (if-let [password (:password message)]
-      (do (promote-to-server! from password)
+      (do (promote-to-receiver! from password)
           (send-message conn {:type :promote :status :ok}))
       (send-message conn {:type :promote
                           :status :error
@@ -80,12 +80,12 @@
 
 (defmethod handle-message :demote [{:keys [from] :as message}]
   (let [conn (connection-for from)]
-    (if (server? from)
+    (if (receiver? from)
       (do (demote-to-client! from)
           (send-message conn {:type :demote :status :ok}))
       (send-message conn {:type :demote
                           :status :error
-                          :cause :not-server}))))
+                          :cause :not-receiver}))))
 
 (defn on-message-handler [conn]
   (fn [raw-message]
@@ -93,7 +93,7 @@
           {:keys [type from]} message]
       (if (valid-peer? from)
         (handle-message message)
-        (send-message conn {:type :error :cause :invalid-from})))))
+        (send-message conn {:type :error :cause :invalid-sender})))))
 
 (defn start-connection [req]
   (d/let-flow [conn (connect req)]
