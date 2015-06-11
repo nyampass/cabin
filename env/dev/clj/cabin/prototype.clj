@@ -107,7 +107,7 @@
   (if-let [password (:password message)]
     (do (promote-to-receiver! from password)
         (send from {:type :promote :status :ok}))
-    (send from {:type :promote :status :error :cause :password-missing})))
+    (send from {:type :promote :status :error :cause :password-required})))
 
 (defmethod handle-message :demote [from message]
   (if (receiver? from)
