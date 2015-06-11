@@ -102,7 +102,10 @@
           #_=> (send from {:type :error :cause :not-receiver})
           (or (nil? password) (not= password (password-for dest)))
           #_=> (send from {:type :error :cause :authorization-failed})
-          :else (send dest (dissoc message :password)))))
+          :else (let [message (-> message
+                                  (assoc :to (:peer-id dest))
+                                  (dissoc :password))]
+                  (send dest message)))))
 
 (defmethod handle-message :promote [from message]
   (if-let [password (:password message)]
@@ -122,7 +125,8 @@
                           (catch Exception _))]
       (if-let [from (find-matching-peer (:from message))]
         (if (= (connection-for from) conn)
-          (handle-message from message)
+          (let [message (assoc message :from (:peer-id from))]
+            (handle-message from message))
           (send-message conn {:type :error :cause :invalid-sender}))
         (send-message conn {:type :error :cause :invalid-sender}))
       (send-message conn {:type :error :cause :invalid-json}))))
