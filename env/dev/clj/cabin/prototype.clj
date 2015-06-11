@@ -117,14 +117,12 @@
 
 (defn on-message-handler [conn]
   (fn [raw-message]
-    (let [message (try
-                    (json/read-str raw-message :key-fn keyword)
-                    (catch Exception _))]
-      (if (nil? message)
-        (send-message conn {:type :error :cause :invalid-json})
-        (if-let [from (find-matching-peer (:from message))]
-          (handle-message from message)
-          (send-message conn {:type :error :cause :invalid-sender}))))))
+    (if-let [message (try (json/read-str raw-message :key-fn keyword)
+                          (catch Exception _))]
+      (if-let [from (find-matching-peer (:from message))]
+        (handle-message from message)
+        (send-message conn {:type :error :cause :invalid-sender}))
+      (send-message conn {:type :error :cause :invalid-json}))))
 
 (defn start-connection [req]
   (d/let-flow [conn (connect req)]
