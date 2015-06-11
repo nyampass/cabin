@@ -35,19 +35,20 @@
   (when (and (string? peer-id) (>= (count peer-id) 4))
     (when-let [peers (matching-peers peer-id)]
       (when (= (count peers) 1)
-        (first peers)))))
+        (let [[peer-id props] (first peers)]
+          {:peer-id peer-id :props props})))))
 
 (defn coerce-to-peer [id-or-peer]
-  (if (vector? id-or-peer)
+  (if (map? id-or-peer)
     id-or-peer
     (find-matching-peer id-or-peer)))
 
 (defn with-peer-props [id-or-peer f]
-  (when-let [[_ props] (coerce-to-peer id-or-peer)]
-    (f props)))
+  (when-let [peer (coerce-to-peer id-or-peer)]
+    (f (:props peer))))
 
 (defn update-peer [peers id-or-peer f & args]
-  (let [[peer-id _] (coerce-to-peer id-or-peer)
+  (let [{:keys [peer-id]} (coerce-to-peer id-or-peer)
         prefix (prefix-of peer-id)]
     (apply update-in peers [prefix peer-id] f args)))
 
