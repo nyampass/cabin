@@ -19,11 +19,6 @@
 
 (defonce debug (atom nil))
 
-(def non-websocket-request
-  {:status 400
-   :headers {"content-type" "application/text"}
-   :body "Expected a websocket request."})
-
 (defn connection-for [peer-id]
   (get-in @peers [peer-id :conn]))
 
