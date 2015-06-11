@@ -15,7 +15,7 @@
    [digest :as digest]
    [clojure.data.json :as json]))
 
-(defonce connections (atom {}))
+(defonce peers (atom {}))
 
 (defonce debug (atom nil))
 
@@ -24,43 +24,44 @@
    :headers {"content-type" "application/text"}
    :body "Expected a websocket request."})
 
-(defn connection-for [id]
-  (get-in @connections [id :conn]))
+(defn connection-for [peer-id]
+  (get-in @peers [peer-id :conn]))
 
-(defn register-connection! [{ip-address :remote-addr} conn]
+(defn register-peer! [{ip-address :remote-addr} conn]
   (let [now (with-out-str
               (#'clojure.instant/print-date (java.util.Date.) *out*))
         new-id (digest/sha1 (str ip-address now))]
-    (swap! connections assoc-in [new-id :conn] conn)
+    (swap! peers assoc-in [new-id :conn] conn)
     new-id))
 
-(defn valid-id? [id]
-  (contains? @connections id))
+(defn valid-peer? [peer-id]
+  (contains? @peers peer-id))
 
-(defn unregister-id! [id]
-  (swap! connections dissoc id))
+(defn unregister-peer! [peer-id]
+  (swap! peers dissoc peer-id))
 
 (defn send-message [conn message]
   (s/put! conn (json/write-str message)))
 
 (defn connect [req]
   (d/let-flow [conn (http/websocket-connection req)]
-    (let [new-id (register-connection! req conn)]
-      (s/on-closed conn #(unregister-id! new-id))
-      (send-message conn {:type :connected :id new-id})
+    (let [new-id (register-peer! req conn)]
+      (s/on-closed conn #(unregister-peer! new-id))
+      (send-message conn {:type :connected :peer-id new-id})
       conn)))
 
-(defn server? [id]
-  (get-in @connections [id :server?]))
+(defn server? [peer-id]
+  (get-in @peers [peer-id :server?]))
 
-(defn promote-to-server! [id pass]
-  (swap! connections update-in [id] merge {:server? true :password pass}))
+(defn promote-to-server! [peer-id pass]
+  (swap! peers update-in [peer-id] merge {:server? true :password pass}))
 
-(defn demote-to-client! [id]
-  (swap! connections update-in [id] dissoc :server? :password))
+(defn demote-to-client! [peer-id]
+  (swap! peers update-in [peer-id] dissoc :server? :password))
 
 (defmulti handle-message (comp keyword :type))
-(defmethod handle-message :default [{:keys [from]}]
+
+(defmethod handle-message :default [{:keys [from to] :as message}]
   (let [conn (connection-for from)]
     (send-message conn {:type :error :cause :unknown-message})))
 
@@ -86,7 +87,7 @@
   (fn [raw-message]
     (let [message (json/read-str raw-message :key-fn keyword)
           {:keys [type from]} message]
-      (if (valid-id? from)
+      (if (valid-peer? from)
         (handle-message message)
         (send-message conn {:type :error :cause :invalid-from})))))
 
