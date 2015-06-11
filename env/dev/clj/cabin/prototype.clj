@@ -89,11 +89,14 @@
 
 (defn on-message-handler [conn]
   (fn [raw-message]
-    (let [message (json/read-str raw-message :key-fn keyword)
-          {:keys [type from]} message]
-      (if (valid-peer? from)
-        (handle-message message)
-        (send-message conn {:type :error :cause :invalid-sender})))))
+    (let [message (try
+                    (json/read-str raw-message :key-fn keyword)
+                    (catch Exception _))]
+      (cond (nil? message)
+            #_=> (send-message conn {:type :error :cause :invalid-json})
+            (not (valid-peer? (:from message)))
+            #_=> (send-message conn {:type :error :cause :invalid-sender})
+            :else (handle-message message)))))
 
 (defn start-connection [req]
   (d/let-flow [conn (connect req)]
