@@ -1,12 +1,5 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>WebSocket Test</title>
-<script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
-<script>
 $(function() {
-  var wsUri = "ws://localhost:3000/ws";
+  var wsUri = "ws://cabin.nyampass.com/ws";
   var $output = $('#output');
   var websocket;
 
@@ -54,11 +47,3 @@ $(function() {
     doSend(message);
   });
 })
-</script>
-<body>
-<h2>WebSocket Test</h2>
-<textarea id="input" rows="5" cols="80"></textarea>
-<button id="submit">Submit</button>
-<div id="output"></div>
-</body>
-</html>
