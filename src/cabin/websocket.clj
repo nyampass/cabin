@@ -1,24 +1,18 @@
-(ns cabin.prototype
+(ns cabin.websocket
   (:refer-clojure :exclude [send])
   (:require
    [compojure.core :refer :all]
-   [ring.util.response :as res]
    [ring.middleware
-    [params :refer [wrap-params]]
     [format :refer [wrap-restful-format]]]
-   [compojure.route :as route]
    [aleph.http :as http]
    [byte-streams :as bs]
-   [manifold.stream :as s]
-   [manifold.deferred :as d]
-   [manifold.bus :as bus]
-   [taoensso.timbre :as timbre]
+   [manifold
+    [stream :as s]
+    [deferred :as d]]
    [digest :as digest]
    [clojure.data.json :as json]))
 
 (defonce peers (atom {}))
-
-(defonce debug (atom nil))
 
 (defn prefix-of [peer-id]
   (subs peer-id 0 4))
@@ -142,23 +136,9 @@
             ;; TODO: postprocess should be performed such as unregistration
             )))))
 
-(defroutes handler
+(defroutes websocket-handler*
   (GET "/ws" req
-       (start-connection req))
-  (route/not-found "No such page."))
+       (start-connection req)))
 
-(def app
-  (-> handler
-      (wrap-restful-format {:formats [:json-kw]})))
-
-(defonce server (atom nil))
-
-(defn start-server []
-  (let [s (http/start-server #'app {:port 10000})]
-    (reset! server s)
-    s))
-
-(defn stop-server []
-  (let [s @server]
-    (reset! server nil)
-    (.close s)))
+(def websocket-handler
+  (wrap-restful-format websocket-handler* {:formats [:json-kw]}))

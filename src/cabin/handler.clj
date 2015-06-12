@@ -1,7 +1,6 @@
 (ns cabin.handler
   (:require [compojure.core :refer [defroutes routes wrap-routes]]
-            [cabin.routes.home :refer [home-routes]]
-            
+            [cabin.websocket :refer [websocket-handler]]
             [cabin.middleware :as middleware]
             [cabin.session :as session]
             [compojure.route :as route]
@@ -66,7 +65,6 @@
 
 (def app
   (-> (routes
-        
-        (wrap-routes home-routes middleware/wrap-csrf)
+        websocket-handler
         base-routes)
       middleware/wrap-base))
