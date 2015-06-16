@@ -2,6 +2,7 @@
     "name": "cabin",
     "version": "0.1.0",
     "description": "client app for cabin service",
+    "main": "main.js",
     "dependencies": {
 	"chrome-app-module-loader": "0.0.3",
 	"bops": "0.1.1",
