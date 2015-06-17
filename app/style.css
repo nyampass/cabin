@@ -29,6 +29,16 @@ html, body {
   height: 50px;
 }
 
+.promotion-menu {
+  position: absolute;
+  margin: auto;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 100px;
+  height: 10px;
+}
+
 .content {
   position: relative;
   width: 100%;
@@ -187,7 +197,7 @@ body:hover.not-mobile #close {
 
 input[type=checkbox],
 input[type=radio] {
-  -webkit-appearance: none;
+/*  -webkit-appearance: none; */
   width: 13px;
   height: 13px;
   border: 1px solid #c6c6c6;
