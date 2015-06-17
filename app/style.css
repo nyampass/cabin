@@ -29,6 +29,16 @@ html, body {
   height: 50px;
 }
 
+.promotion-menu {
+  position: absolute;
+  margin: auto;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 100px;
+  height: 10px;
+}
+
 .content {
   position: relative;
   width: 100%;
