@@ -3,13 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <link rel="stylesheet" type="text/css" href="style.css" />
+    <script src="node_modules/moment/moment.js"></script>
     <script src="jquery.js"></script>
     <script>
 window.$ = window.jQuery = require('./jquery.js');
 
 $(function() {
   var wsUri = "ws://cabin.nyampass.com/ws";
-  var $output = $('#output');
+  var $logtext = $('#log-text');
   var websocket;
 
   function startWebsocket() {
@@ -29,11 +30,11 @@ $(function() {
   }
 
   function onMessage(evt) {
-    appendMessage('<span style="color: blue;">RESPONSE: ' + evt.data+'</span>');
+    appendMessage('RESPONSE: ' + evt.data);
   }
 
   function onError(evt) {
-    appendMessage('<span style="color: red;">ERROR:</span> ' + evt.data);
+    appendMessage('ERROR: ' + evt.data);
   }
 
   function doSend(message) {
@@ -42,9 +43,9 @@ $(function() {
   }
 
   function appendMessage(message) {
-    var $pre = $("<p/>").css("word-wrap", "break-word")
-                        .html(message);
-    $output.append($pre);
+    var datetime = moment().format('YYYY/MM/DD HH:mm:ss');
+    var text = $logtext.val();
+    $logtext.val(text + '[' + datetime + '] ' + message + '\n');
   }
 
   startWebsocket();
@@ -73,7 +74,7 @@ $(function() {
           </div>
         </div>
         <div class="log-area">
-          <textarea id="log-window"></textarea>
+          <textarea id="log-text"></textarea>
         </div>
       </div>
     </body>
