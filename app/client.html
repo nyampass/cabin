@@ -59,8 +59,22 @@ $(function() {
 </script>
     <title>cabin</title>
     <body>
-      <textarea id="input" rows="5" cols="80"></textarea>
-      <button id="submit" class="button">送信!</button>
-      <div id="output"></div>
+      <div class="container">
+        <div class="menu-area">
+        </div>
+        <div class="content">
+          <div class="editor">
+            <textarea id="input"></textarea>
+          </div>
+          <div class="button-area">
+            <div class="padd">
+              <button id="submit" class="button">送信!</button>
+            </div>
+          </div>
+        </div>
+        <div class="log-area">
+          <textarea id="log-window"></textarea>
+        </div>
+      </div>
     </body>
 </html>
