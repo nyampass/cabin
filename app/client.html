@@ -10,8 +10,13 @@ window.$ = window.jQuery = require('./jquery.js');
 
 $(function() {
   var wsUri = "ws://cabin.nyampass.com/ws";
+  var $promoted = $('#promoted');
+  var $input = $('#input');
+  var $submit = $('#submit');
   var $logtext = $('#log-text');
+
   var websocket;
+  var peerId;
 
   function startWebsocket() {
     websocket = new WebSocket(wsUri);
@@ -30,7 +35,19 @@ $(function() {
   }
 
   function onMessage(evt) {
-    appendMessage('RESPONSE: ' + evt.data);
+    var rawMessage = evt.data;
+    var message;
+
+    appendMessage('RESPONSE: ' + rawMessage);
+
+    message = JSON.parse(rawMessage);
+    if (message.type == 'connected') {
+      peerId = message["peer-id"];
+    } else if (message.type == 'promote' && message.status == 'ok') {
+      $promoted.prop('checked', true);
+    } else if (message.type == 'demote' && message.status == 'ok') {
+      $promoted.prop('checked', false);
+    }
   }
 
   function onError(evt) {
@@ -45,12 +62,21 @@ $(function() {
   function appendMessage(message) {
     var datetime = moment().format('YYYY/MM/DD HH:mm:ss');
     var text = $logtext.val();
-    $logtext.val(text + '[' + datetime + '] ' + message + '\n');
+    $logtext.val(text + '[' + datetime + '] ' + message + '\n')
+            .scrollTop($logtext[0].scrollHeight - $logtext.height());
   }
 
   startWebsocket();
-  var $input = $('#input');
-  var $submit = $('#submit');
+
+  $promoted.click(function() {
+    if ($(this).is(':checked')) {
+      var request = {type: 'promote', from: peerId, password: 'hoge'};
+      doSend(JSON.stringify(request));
+    } else {
+      var request = {type: 'demote', from: peerId};
+      doSend(JSON.stringify(request));
+    }
+  });
 
   $submit.click(function() {
     var message = $input.val();
