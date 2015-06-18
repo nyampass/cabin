@@ -10,6 +10,7 @@ window.$ = window.jQuery = require('./jquery.js');
 
 $(function() {
   var wsUri = "ws://cabin.nyampass.com/ws";
+  var $peerId = $('#peer-id');
   var $promoted = $('#promoted');
   var $code = $('#code');
   var $exec = $('#exec');
@@ -43,6 +44,7 @@ $(function() {
     message = JSON.parse(rawMessage);
     if (message.type == 'connected') {
       peerId = message["peer-id"];
+      $peerId.html(peerId);
     } else if (message.type == 'promote' && message.status == 'ok') {
       $promoted.prop('checked', true);
     } else if (message.type == 'demote' && message.status == 'ok') {
@@ -70,7 +72,8 @@ $(function() {
 
   $promoted.click(function() {
     if ($(this).is(':checked')) {
-      var request = {type: 'promote', from: peerId, password: 'hoge'};
+      var password = $('#password').val();
+      var request = {type: 'promote', from: peerId, password: password};
       doSend(JSON.stringify(request));
     } else {
       var request = {type: 'demote', from: peerId};
@@ -88,7 +91,10 @@ $(function() {
     <body>
       <div class="container">
         <div class="menu-area">
+          <div class="user-menu">ID: <span id="peer-id"></span></div>
           <div class="promotion-menu">
+            <span>Password: </span>
+            <input id="password" type="text"></input>
             <input id="promoted" type="checkbox"></input>
             <span>待受可能</span>
           </div>
