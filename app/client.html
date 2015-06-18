@@ -11,8 +11,8 @@ window.$ = window.jQuery = require('./jquery.js');
 $(function() {
   var wsUri = "ws://cabin.nyampass.com/ws";
   var $promoted = $('#promoted');
-  var $input = $('#input');
-  var $submit = $('#submit');
+  var $code = $('#code');
+  var $exec = $('#exec');
   var $logtext = $('#log-text');
 
   var websocket;
@@ -78,9 +78,9 @@ $(function() {
     }
   });
 
-  $submit.click(function() {
-    var message = $input.val();
-    doSend(message);
+  $exec.click(function() {
+    var code = $code.val();
+    eval(code);
   });
 })
 </script>
@@ -95,11 +95,11 @@ $(function() {
         </div>
         <div class="content">
           <div class="editor">
-            <textarea id="input"></textarea>
+            <textarea id="code"></textarea>
           </div>
           <div class="button-area">
             <div class="padd">
-              <button id="submit" class="button">送信!</button>
+              <button id="exec" class="button">実行</button>
             </div>
           </div>
         </div>
