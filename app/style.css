@@ -29,14 +29,28 @@ html, body {
   height: 50px;
 }
 
+.user-menu {
+  position: absolute;
+  margin: auto;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  height: 10px;
+}
+
 .promotion-menu {
   position: absolute;
   margin: auto;
   top: 0;
   bottom: 0;
   right: 0;
-  width: 100px;
   height: 10px;
+}
+
+.promotion-menu input[type=text] {
+  margin-right: 15px;
+  width: 100px;
+  height: 15px;
 }
 
 .content {
@@ -262,45 +276,6 @@ input[type=radio]:checked::after {
 input[type=checkbox]:focus {
   outline: none;
   border-color: #4d90fe;
-}
-
-input[type=text] {
-  background-color: #fff;
-  border: 1px solid #d9d9d9;
-  border-top: 1px solid #c0c0c0;
-  box-sizing: border-box;
-  -webkit-box-sizing: border-box;
-  border-radius: 1 px;
-  -webkit-border-radius: 1px;
-  color: #333;
-  display: inline-block;
-  font-family: "Quicksand", "Open Sans", sans-serif;
-  font-size: 16px;
-  height: 32px;
-  line-height: 30px;
-  padding-left: 8px;
-  vertical-align: middle;
-  margin-bottom: 15px;
-  width: 270px;
-  -webkit-app-region: no-drag;
-}
-
-input[type=text]:hover {
-  border: 1px solid #b9b9b9;
-  border-top: 1px solid #a0a0a0;
-  box-shadow: inset 0px 1px 2px rgba(0, 0, 0, 0.1);
-  -webkit-box-shadow: inset 0px 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-input[type=text]:focus {
-  border: 1px solid #4d90fe;
-  box-shadow: inset 0px 1px 2px rgba(0, 0, 0, 0.3);
-  -webkit-box-shadow: inset 0px 1px 2px rgba(0, 0, 0, 0.3);
-  outline: none;
-}
-
-input[type=text].form-error{
-  border: 1px solid #ff3f3f;
 }
 
 #error-message {
