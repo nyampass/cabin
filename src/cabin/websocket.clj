@@ -94,8 +94,8 @@
           #_=> (send from {:type :error :cause :invalid-receiver})
           (not (receiver? dest))
           #_=> (send from {:type :error :cause :not-receiver})
-          (or (= (:type message) :result)
-              (nil? password) (not= password (password-for dest)))
+          (and (not= (:type message) :result)
+               (or (nil? password) (not= password (password-for dest))))
           #_=> (send from {:type :error :cause :authorization-failed})
           :else (let [message (-> message
                                   (assoc :to (:peer-id dest))
