@@ -3,14 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <link rel="stylesheet" type="text/css" href="style.css" />
+    <script src="node_modules/moment/moment.js"></script>
     <script src="jquery.js"></script>
     <script>
 window.$ = window.jQuery = require('./jquery.js');
 
 $(function() {
   var wsUri = "ws://cabin.nyampass.com/ws";
-  var $output = $('#output');
+  var $peerId = $('#peer-id');
+  var $promoted = $('#promoted');
+  var $code = $('#code');
+  var $exec = $('#exec');
+  var $logtext = $('#log-text');
+
   var websocket;
+  var peerId;
 
   function startWebsocket() {
     websocket = new WebSocket(wsUri);
@@ -29,11 +36,24 @@ $(function() {
   }
 
   function onMessage(evt) {
-    appendMessage('<span style="color: blue;">RESPONSE: ' + evt.data+'</span>');
+    var rawMessage = evt.data;
+    var message;
+
+    appendMessage('RESPONSE: ' + rawMessage);
+
+    message = JSON.parse(rawMessage);
+    if (message.type == 'connected') {
+      peerId = message["peer-id"];
+      $peerId.html(peerId);
+    } else if (message.type == 'promote' && message.status == 'ok') {
+      $promoted.prop('checked', true);
+    } else if (message.type == 'demote' && message.status == 'ok') {
+      $promoted.prop('checked', false);
+    }
   }
 
   function onError(evt) {
-    appendMessage('<span style="color: red;">ERROR:</span> ' + evt.data);
+    appendMessage('ERROR: ' + evt.data);
   }
 
   function doSend(message) {
@@ -42,25 +62,56 @@ $(function() {
   }
 
   function appendMessage(message) {
-    var $pre = $("<p/>").css("word-wrap", "break-word")
-                        .html(message);
-    $output.append($pre);
+    var datetime = moment().format('YYYY/MM/DD HH:mm:ss');
+    var text = $logtext.val();
+    $logtext.val(text + '[' + datetime + '] ' + message + '\n')
+            .scrollTop($logtext[0].scrollHeight - $logtext.height());
   }
 
   startWebsocket();
-  var $input = $('#input');
-  var $submit = $('#submit');
 
-  $submit.click(function() {
-    var message = $input.val();
-    doSend(message);
+  $promoted.click(function() {
+    if ($(this).is(':checked')) {
+      var password = $('#password').val();
+      var request = {type: 'promote', from: peerId, password: password};
+      doSend(JSON.stringify(request));
+    } else {
+      var request = {type: 'demote', from: peerId};
+      doSend(JSON.stringify(request));
+    }
+  });
+
+  $exec.click(function() {
+    var code = $code.val();
+    eval(code);
   });
 })
 </script>
     <title>cabin</title>
     <body>
-      <textarea id="input" rows="5" cols="80"></textarea>
-      <button id="submit" class="button">送信!</button>
-      <div id="output"></div>
+      <div class="container">
+        <div class="menu-area">
+          <div class="user-menu">ID: <span id="peer-id"></span></div>
+          <div class="promotion-menu">
+            <span>Password: </span>
+            <input id="password" type="text"></input>
+            <input id="promoted" type="checkbox"></input>
+            <span>待受可能</span>
+          </div>
+        </div>
+        <div class="content">
+          <div class="editor">
+            <textarea id="code"></textarea>
+          </div>
+          <div class="button-area">
+            <div class="padd">
+              <button id="exec" class="button">実行</button>
+            </div>
+          </div>
+        </div>
+        <div class="log-area">
+          <textarea id="log-text"></textarea>
+        </div>
+      </div>
     </body>
 </html>

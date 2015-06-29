@@ -1,8 +1,9 @@
 {
-    "name": "cabin",
-    "version": "0.1.0",
-    "description": "client app for cabin service",
-    "main": "main.js",
-    "dependencies": {
-    }
+  "name": "cabin",
+  "version": "0.1.0",
+  "description": "client app for cabin service",
+  "main": "main.js",
+  "dependencies": {
+    "moment": "^2.10.3"
+  }
 }
