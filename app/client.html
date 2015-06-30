@@ -6,10 +6,8 @@
     <script src="node_modules/moment/moment.js"></script>
     <script src="jquery.js"></script>
     <script>
-window.$ = window.jQuery = require('./jquery.js');
-
 $(function() {
-  var wsUri = "ws://cabin.nyampass.com/ws";
+  var wsUri = "ws://localhost:3000/ws";
   var $peerId = $('#peer-id');
   var $promoted = $('#promoted');
   var $code = $('#code');

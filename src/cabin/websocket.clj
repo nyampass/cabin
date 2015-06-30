@@ -88,20 +88,6 @@
 
 (defmulti handle-message (fn [from message] (keyword (:type message))))
 
-(defmethod handle-message :default [from {:keys [to password] :as message}]
-  (let [dest (find-matching-peer to)]
-    (cond (nil? dest)
-          #_=> (send from {:type :error :cause :invalid-receiver})
-          (not (receiver? dest))
-          #_=> (send from {:type :error :cause :not-receiver})
-          (and (not= (:type message) :result)
-               (or (nil? password) (not= password (password-for dest))))
-          #_=> (send from {:type :error :cause :authorization-failed})
-          :else (let [message (-> message
-                                  (assoc :to (:peer-id dest))
-                                  (dissoc :password))]
-                  (send dest message)))))
-
 (defmethod handle-message :promote [from message]
   (if-let [password (:password message)]
     (do (promote-to-receiver! from password)
@@ -113,6 +99,29 @@
     (do (demote-to-client! from)
         (send from {:type :demote :status :ok}))
     (send from {:type :demote :status :error :cause :not-receiver})))
+
+(defn with-valid-destination [to from f]
+  (if-let [dest (find-matching-peer to)]
+    (f dest)
+    (send from {:type :error :cause :invalid-receiver})))
+
+(defmethod handle-message :result [from {:keys [to] :as message}]
+  (with-valid-destination to from
+    (fn [dest]
+      (send dest (assoc message :to (:peer-id dest))))))
+
+(defmethod handle-message :default [from {:keys [to password] :as message}]
+  (with-valid-destination to from
+    (fn [dest]
+      (cond (not (receiver? dest))
+            #_=> (send from {:type :error :cause :not-receiver})
+            (and (not= (:type message) :result)
+                 (or (nil? password) (not= password (password-for dest))))
+            #_=> (send from {:type :error :cause :authorization-failed})
+            :else (let [message (-> message
+                                    (assoc :to (:peer-id dest))
+                                    (dissoc :password))]
+                    (send dest message))))))
 
 (defn on-message-handler [conn]
   (fn [raw-message]
