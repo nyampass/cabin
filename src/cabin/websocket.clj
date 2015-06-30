@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [send])
   (:require
    [compojure.core :refer :all]
+   [taoensso.timbre :as timbre]
    [ring.middleware
     [format :refer [wrap-restful-format]]]
    [aleph.http :as http]
@@ -65,6 +66,8 @@
   (s/put! conn (json/write-str message)))
 
 (defn send [id-or-peer message]
+  (let [peer (coerce-to-peer id-or-peer)]
+    (timbre/debug "message sent:" message "to" (:peer-id peer)))
   (send-message (connection-for id-or-peer) message))
 
 (defn connect [req]
@@ -127,12 +130,13 @@
   (fn [raw-message]
     (if-let [message (try (json/read-str raw-message :key-fn keyword)
                           (catch Exception _))]
-      (if-let [from (find-matching-peer (:from message))]
-        (if (= (connection-for from) conn)
-          (let [message (assoc message :from (:peer-id from))]
-            (handle-message from message))
-          (send-message conn {:type :error :cause :invalid-sender}))
-        (send-message conn {:type :error :cause :invalid-sender}))
+      (do (timbre/debug "message received:" message)
+          (if-let [from (find-matching-peer (:from message))]
+            (if (= (connection-for from) conn)
+              (let [message (assoc message :from (:peer-id from))]
+                (handle-message from message))
+              (send-message conn {:type :error :cause :invalid-sender}))
+            (send-message conn {:type :error :cause :invalid-sender})))
       (send-message conn {:type :error :cause :invalid-json}))))
 
 (defn start-connection [req]
