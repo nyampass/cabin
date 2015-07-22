@@ -19,7 +19,8 @@
                  [aleph "0.4.0"]
                  [digest "1.4.4"]
                  [org.clojure/data.json "0.2.6"]
-                 [clj-time "0.10.0"]]
+                 [clj-time "0.10.0"]
+                 [com.novemberain/monger "3.0.0"]]
   :min-lein-version "2.0.0"
   :uberjar-name "cabin.jar"
   :jvm-opts ["-server"]
