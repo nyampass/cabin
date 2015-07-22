@@ -11,7 +11,8 @@
     [stream :as s]
     [deferred :as d]]
    [digest :as digest]
-   [clojure.data.json :as json]))
+   [clojure.data.json :as json]
+   [clj-time.core :as t]))
 
 (defonce peers (atom {}))
 
@@ -51,8 +52,7 @@
   (with-peer-props id-or-peer :conn))
 
 (defn register-peer! [{ip-address :remote-addr} conn]
-  (let [now (with-out-str
-              (#'clojure.instant/print-date (java.util.Date.) *out*))
+  (let [now (t/now)
         new-id (digest/sha1 (str ip-address now))
         prefix (prefix-of new-id)]
     (swap! peers assoc-in [prefix new-id :conn] conn)
