@@ -24,7 +24,6 @@
   :jvm-opts ["-server"]
 ;;enable to start the nREPL server when the application launches
 ;:env {:repl-port 7001}
-  :main cabin.core
   :plugins [[lein-environ "1.0.0"]
             [lein-ancient "0.6.5"]]
   :profiles
@@ -34,9 +33,8 @@
    :dev {:dependencies [[ring-mock "0.1.5"]
                         [ring/ring-devel "1.3.2"]
                         [pjstadig/humane-test-output "0.7.0"]
-                        ]
-         :source-paths ["env/dev/clj"]
-         :repl-options {:init-ns cabin.core}
+                        [org.clojure/tools.namespace "0.2.11"]]
+         :source-paths ["dev"]
          :injections [(require 'pjstadig.humane-test-output)
                       (pjstadig.humane-test-output/activate!)]
          :env {:dev true}}})
