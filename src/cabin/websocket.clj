@@ -94,6 +94,10 @@
   (assert (registered-custom-name? name))
   (swap! custom-names dissoc name))
 
+(defn password-for-custom-name [name]
+  (assert (registered-custom-name? name))
+  (:password (get @custom-names name)))
+
 (defn send-message [conn message]
   (s/put! conn (json/write-str message)))
 
@@ -124,10 +128,25 @@
 (defmulti handle-message (fn [from message] (keyword (:type message))))
 
 (defmethod handle-message :promote [from message]
-  (if-let [password (:password message)]
-    (do (promote-to-receiver! from password)
-        (send from {:type :promote :status :ok}))
-    (send from {:type :promote :status :error :cause :password-required})))
+  (letfn [(respond [status & {:as opts}]
+            (send from (merge {:type :promote :status status} opts)))
+          (promote! [from password]
+            (promote-to-receiver! from password)
+            (respond :ok))]
+    (if-let [password (:password message)]
+      (let [{name :custom-name name-pass :custom-name-password} message]
+        (cond (and (not name) (not name-pass))
+              #_=> (promote! from password)
+              (and name name-pass)
+              #_=> (if (or (not (registered-custom-name? name))
+                           (= (password-for-custom-name name) name-pass))
+                     (do (register-custom-name! (:peer-id from)
+                                                name
+                                                name-pass)
+                         (promote! from password))
+                     (respond :error :cause :custom-name-already-in-use))
+              :else (respond :error :cause :custom-name-not-enabled)))
+      (respond :error :cause :password-required))))
 
 (defmethod handle-message :demote [from message]
   (if (receiver? from)
