@@ -39,4 +39,5 @@
          :source-paths ["dev"]
          :injections [(require 'pjstadig.humane-test-output)
                       (pjstadig.humane-test-output/activate!)]
-         :env {:dev true}}})
+         :env {:dev true
+               :mongo-uri "mongodb://127.0.0.1/cabin"}}})
