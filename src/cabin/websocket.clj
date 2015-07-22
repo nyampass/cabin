@@ -15,6 +15,14 @@
    [clj-time.core :as t]))
 
 (defonce peers (atom {}))
+(defonce custom-names (atom {}))
+
+(defprotocol PeerLike
+  (coerce-to-peer [this]))
+
+(defrecord Peer [peer-id conn receiver? password])
+
+(defrecord CustomName [name peer-id password last-accessed-at])
 
 (defprotocol PeerLike
   (coerce-to-peer [this]))
@@ -43,7 +51,9 @@
   (coerce-to-peer [this] this)
   String
   (coerce-to-peer [this]
-    (find-matching-peer this)))
+    (if-let [custom-name (get @custom-names this)]
+      (find-matching-peer (:peer-id custom-name))
+      (find-matching-peer this))))
 
 (defn with-peer [peer-like f]
   (when-let [peer (coerce-to-peer peer-like)]
@@ -68,6 +78,21 @@
 (defn unregister-peer! [peer-id]
   (let [prefix (prefix-of peer-id)]
     (swap! peers update-in [prefix] dissoc)))
+
+(defn registered-custom-name? [name]
+  (get @custom-names name))
+
+(defn register-custom-name! [peer-id name password]
+  (assert (not (registered-custom-name? name)))
+  (let [custom-name (map->CustomName {:name name
+                                      :password password
+                                      :peer-id peer-id
+                                      :last-accessed-at (t/now)})]
+    (swap! custom-names assoc name custom-name)))
+
+(defn unregister-custom-name! [name password]
+  (assert (registered-custom-name? name))
+  (swap! custom-names dissoc name))
 
 (defn send-message [conn message]
   (s/put! conn (json/write-str message)))
@@ -111,7 +136,7 @@
     (send from {:type :demote :status :error :cause :not-receiver})))
 
 (defn with-valid-destination [to from f]
-  (if-let [dest (find-matching-peer to)]
+  (if-let [dest (coerce-to-peer to)]
     (f dest)
     (send from {:type :error :cause :invalid-receiver})))
 
