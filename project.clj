@@ -19,7 +19,8 @@
                  [aleph "0.4.0"]
                  [digest "1.4.4"]
                  [org.clojure/data.json "0.2.6"]
-                 [clj-time "0.10.0"]]
+                 [clj-time "0.10.0"]
+                 [com.novemberain/monger "3.0.0"]]
   :min-lein-version "2.0.0"
   :uberjar-name "cabin.jar"
   :jvm-opts ["-server"]
@@ -38,4 +39,5 @@
          :source-paths ["dev"]
          :injections [(require 'pjstadig.humane-test-output)
                       (pjstadig.humane-test-output/activate!)]
-         :env {:dev true}}})
+         :env {:dev true
+               :mongo-uri "mongodb://127.0.0.1/cabin"}}})
