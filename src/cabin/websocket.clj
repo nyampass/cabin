@@ -97,7 +97,7 @@
   (swap! peers update-peer peer-like merge {:receiver? true :password pass}))
 
 (defn demote-to-client! [peer-like]
-  (swap! peers update-peer peer-like merge {:reciever? false :password nil}))
+  (swap! peers update-peer peer-like merge {:receiver? false :password nil}))
 
 (defmulti handle-message (fn [from message] (keyword (:type message))))
 
