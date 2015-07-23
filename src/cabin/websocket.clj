@@ -22,11 +22,6 @@
 
 (defrecord Peer [peer-id conn receiver? password])
 
-(defprotocol PeerLike
-  (coerce-to-peer [this]))
-
-(defrecord Peer [peer-id conn receiver? password])
-
 (defn prefix-of [peer-id]
   (subs peer-id 0 4))
 
