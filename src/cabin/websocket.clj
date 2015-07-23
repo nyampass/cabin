@@ -12,17 +12,15 @@
     [deferred :as d]]
    [digest :as digest]
    [clojure.data.json :as json]
-   [clj-time.core :as t]))
+   [clj-time.core :as t]
+   [cabin.db.custom-name :as cn]))
 
 (defonce peers (atom {}))
-(defonce custom-names (atom {}))
 
 (defprotocol PeerLike
   (coerce-to-peer [this]))
 
 (defrecord Peer [peer-id conn receiver? password])
-
-(defrecord CustomName [name peer-id password last-accessed-at])
 
 (defprotocol PeerLike
   (coerce-to-peer [this]))
@@ -51,8 +49,8 @@
   (coerce-to-peer [this] this)
   String
   (coerce-to-peer [this]
-    (if-let [custom-name (get @custom-names this)]
-      (find-matching-peer (:peer-id custom-name))
+    (if-let [peer-id (cn/peer-id-for this)]
+      (find-matching-peer peer-id)
       (find-matching-peer this))))
 
 (defn with-peer [peer-like f]
@@ -78,25 +76,6 @@
 (defn unregister-peer! [peer-id]
   (let [prefix (prefix-of peer-id)]
     (swap! peers update-in [prefix] dissoc)))
-
-(defn registered-custom-name? [name]
-  (get @custom-names name))
-
-(defn register-custom-name! [peer-id name password]
-  (assert (not (registered-custom-name? name)))
-  (let [custom-name (map->CustomName {:name name
-                                      :password password
-                                      :peer-id peer-id
-                                      :last-accessed-at (t/now)})]
-    (swap! custom-names assoc name custom-name)))
-
-(defn unregister-custom-name! [name password]
-  (assert (registered-custom-name? name))
-  (swap! custom-names dissoc name))
-
-(defn password-for-custom-name [name]
-  (assert (registered-custom-name? name))
-  (:password (get @custom-names name)))
 
 (defn send-message [conn message]
   (s/put! conn (json/write-str message)))
@@ -138,12 +117,8 @@
         (cond (and (not name) (not name-pass))
               #_=> (promote! from password)
               (and name name-pass)
-              #_=> (if (or (not (registered-custom-name? name))
-                           (= (password-for-custom-name name) name-pass))
-                     (do (register-custom-name! (:peer-id from)
-                                                name
-                                                name-pass)
-                         (promote! from password))
+              #_=> (if (cn/register-custom-name! (:peer-id from) name name-pass)
+                     (promote! from password)
                      (respond :error :cause :custom-name-already-in-use))
               :else (respond :error :cause :custom-name-not-enabled)))
       (respond :error :cause :password-required))))
