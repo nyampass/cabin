@@ -94,7 +94,8 @@
   (with-peer peer-like :password))
 
 (defn promote-to-receiver! [peer-like pass]
-  (swap! peers update-peer peer-like merge {:receiver? true :password pass}))
+  (let [pass (digest/sha1 pass)]
+    (swap! peers update-peer peer-like merge {:receiver? true :password pass})))
 
 (defn demote-to-client! [peer-like]
   (swap! peers update-peer peer-like merge {:receiver? false :password nil}))
@@ -140,7 +141,8 @@
       (cond (not (receiver? dest))
             #_=> (send from {:type :error :cause :not-receiver})
             (and (not= (:type message) :result)
-                 (or (nil? password) (not= password (password-for dest))))
+                 (or (nil? password)
+                     (not= (digest/sha1 password) (password-for dest))))
             #_=> (send from {:type :error :cause :authorization-failed})
             :else (let [message (-> message
                                     (assoc :to (:peer-id dest))
