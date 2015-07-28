@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [send])
   (:require
    [compojure.core :refer :all]
+   [taoensso.timbre :as timbre]
    [ring.middleware
     [format :refer [wrap-restful-format]]]
    [aleph.http :as http]
@@ -10,9 +11,16 @@
     [stream :as s]
     [deferred :as d]]
    [digest :as digest]
-   [clojure.data.json :as json]))
+   [clojure.data.json :as json]
+   [clj-time.core :as t]
+   [cabin.db.custom-name :as cn]))
 
 (defonce peers (atom {}))
+
+(defprotocol PeerLike
+  (coerce-to-peer [this]))
+
+(defrecord Peer [peer-id conn receiver? password])
 
 (defn prefix-of [peer-id]
   (subs peer-id 0 4))
@@ -29,43 +37,48 @@
   (when (and (string? peer-id) (>= (count peer-id) 4))
     (when-let [peers (matching-peers peer-id)]
       (when (= (count peers) 1)
-        (let [[peer-id props] (first peers)]
-          {:peer-id peer-id :props props})))))
+        (val (first peers))))))
 
-(defn coerce-to-peer [id-or-peer]
-  (if (map? id-or-peer)
-    id-or-peer
-    (find-matching-peer id-or-peer)))
+(extend-protocol PeerLike
+  Peer
+  (coerce-to-peer [this] this)
+  String
+  (coerce-to-peer [this]
+    (if-let [peer-id (cn/peer-id-for this)]
+      (find-matching-peer peer-id)
+      (find-matching-peer this))))
 
-(defn with-peer-props [id-or-peer f]
-  (when-let [peer (coerce-to-peer id-or-peer)]
-    (f (:props peer))))
+(defn with-peer [peer-like f]
+  (when-let [peer (coerce-to-peer peer-like)]
+    (f peer)))
 
-(defn update-peer [peers id-or-peer f & args]
-  (let [{:keys [peer-id]} (coerce-to-peer id-or-peer)
+(defn update-peer [peers peer-like f & args]
+  (let [{:keys [peer-id]} (coerce-to-peer peer-like)
         prefix (prefix-of peer-id)]
     (apply update-in peers [prefix peer-id] f args)))
 
-(defn connection-for [id-or-peer]
-  (with-peer-props id-or-peer :conn))
+(defn connection-for [peer-like]
+  (with-peer peer-like :conn))
 
 (defn register-peer! [{ip-address :remote-addr} conn]
-  (let [now (with-out-str
-              (#'clojure.instant/print-date (java.util.Date.) *out*))
+  (let [now (t/now)
         new-id (digest/sha1 (str ip-address now))
         prefix (prefix-of new-id)]
-    (swap! peers assoc-in [prefix new-id :conn] conn)
+    (swap! peers assoc-in [prefix new-id]
+           (map->Peer {:peer-id new-id :conn conn}))
     new-id))
 
-(defn unregister-peer! [exact-peer-id]
-  (let [prefix (prefix-of exact-peer-id)]
-    (swap! peers update-in [prefix] dissoc exact-peer-id)))
+(defn unregister-peer! [peer-id]
+  (let [prefix (prefix-of peer-id)]
+    (swap! peers update-in [prefix] dissoc)))
 
 (defn send-message [conn message]
   (s/put! conn (json/write-str message)))
 
-(defn send [id-or-peer message]
-  (send-message (connection-for id-or-peer) message))
+(defn send [peer-like message]
+  (let [peer (coerce-to-peer peer-like)]
+    (timbre/debug "message sent:" message "to" (:peer-id peer)))
+  (send-message (connection-for peer-like) message))
 
 (defn connect [req]
   (d/let-flow [conn (http/websocket-connection req)]
@@ -74,25 +87,37 @@
       (send-message conn {:type :connected :peer-id new-id})
       conn)))
 
-(defn receiver? [id-or-peer]
-  (with-peer-props id-or-peer :receiver?))
+(defn receiver? [peer-like]
+  (with-peer peer-like :receiver?))
 
-(defn password-for [id-or-peer]
-  (with-peer-props id-or-peer :password))
+(defn password-for [peer-like]
+  (with-peer peer-like :password))
 
-(defn promote-to-receiver! [id-or-peer pass]
-  (swap! peers update-peer id-or-peer merge {:receiver? true :password pass}))
+(defn promote-to-receiver! [peer-like pass]
+  (let [pass (digest/sha1 pass)]
+    (swap! peers update-peer peer-like merge {:receiver? true :password pass})))
 
-(defn demote-to-client! [id-or-peer]
-  (swap! peers update-peer id-or-peer dissoc :receiver? :password))
+(defn demote-to-client! [peer-like]
+  (swap! peers update-peer peer-like merge {:receiver? false :password nil}))
 
 (defmulti handle-message (fn [from message] (keyword (:type message))))
 
 (defmethod handle-message :promote [from message]
-  (if-let [password (:password message)]
-    (do (promote-to-receiver! from password)
-        (send from {:type :promote :status :ok}))
-    (send from {:type :promote :status :error :cause :password-required})))
+  (letfn [(respond [status & {:as opts}]
+            (send from (merge {:type :promote :status status} opts)))
+          (promote! [from password]
+            (promote-to-receiver! from password)
+            (respond :ok))]
+    (if-let [password (:password message)]
+      (let [{name :custom-name name-pass :custom-name-password} message]
+        (cond (and (not name) (not name-pass))
+              #_=> (promote! from password)
+              (and name name-pass)
+              #_=> (if (cn/register-custom-name! (:peer-id from) name name-pass)
+                     (promote! from password)
+                     (respond :error :cause :custom-name-already-in-use))
+              :else (respond :error :cause :custom-name-not-enabled)))
+      (respond :error :cause :password-required))))
 
 (defmethod handle-message :demote [from message]
   (if (receiver? from)
@@ -101,7 +126,7 @@
     (send from {:type :demote :status :error :cause :not-receiver})))
 
 (defn with-valid-destination [to from f]
-  (if-let [dest (find-matching-peer to)]
+  (if-let [dest (coerce-to-peer to)]
     (f dest)
     (send from {:type :error :cause :invalid-receiver})))
 
@@ -116,7 +141,8 @@
       (cond (not (receiver? dest))
             #_=> (send from {:type :error :cause :not-receiver})
             (and (not= (:type message) :result)
-                 (or (nil? password) (not= password (password-for dest))))
+                 (or (nil? password)
+                     (not= (digest/sha1 password) (password-for dest))))
             #_=> (send from {:type :error :cause :authorization-failed})
             :else (let [message (-> message
                                     (assoc :to (:peer-id dest))
@@ -127,12 +153,13 @@
   (fn [raw-message]
     (if-let [message (try (json/read-str raw-message :key-fn keyword)
                           (catch Exception _))]
-      (if-let [from (find-matching-peer (:from message))]
-        (if (= (connection-for from) conn)
-          (let [message (assoc message :from (:peer-id from))]
-            (handle-message from message))
-          (send-message conn {:type :error :cause :invalid-sender}))
-        (send-message conn {:type :error :cause :invalid-sender}))
+      (do (timbre/debug "message received:" message)
+          (if-let [from (find-matching-peer (:from message))]
+            (if (= (connection-for from) conn)
+              (let [message (assoc message :from (:peer-id from))]
+                (handle-message from message))
+              (send-message conn {:type :error :cause :invalid-sender}))
+            (send-message conn {:type :error :cause :invalid-sender})))
       (send-message conn {:type :error :cause :invalid-json}))))
 
 (defn start-connection [req]
