@@ -26,6 +26,7 @@
   :jvm-opts ["-server"]
 ;;enable to start the nREPL server when the application launches
 ;:env {:repl-port 7001}
+  :main cabin.core
   :plugins [[lein-environ "1.0.0"]
             [lein-ancient "0.6.5"]]
   :profiles
