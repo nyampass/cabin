@@ -135,6 +135,11 @@
     (fn [dest]
       (send dest (assoc message :to (:peer-id dest))))))
 
+(defmethod handle-message :event [from {:keys [to] :as message}]
+  (with-valid-destination to from
+    (fn [dest]
+      (send dest (assoc message :to (:peer-id dest))))))
+
 (defmethod handle-message :default [from {:keys [to password] :as message}]
   (with-valid-destination to from
     (fn [dest]
